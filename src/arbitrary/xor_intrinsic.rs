@@ -94,7 +94,7 @@ pub unsafe fn xor_chunks_intrinsic_baseline<T>(data: *mut u8, key: *const u8) {
                 "strb {tmp}, [{data}, #1]!",
                 "sub {size}, {size}, #1",
             "2:",
-                "cmp {size}, #0"
+                "cmp {size}, #0",
                 "bne 1b",
             key_byte = out(vreg) _,
             tmp = out(vreg) _,
