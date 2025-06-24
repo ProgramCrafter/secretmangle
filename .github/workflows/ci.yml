@@ -37,15 +37,15 @@ jobs:
         toolchain: nightly
         override: true
 
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2.7.8
+
     - name: Install cross (if needed)
       if: matrix.cross
       run: cargo install cross --version 0.2.5
 
     - name: Install target
       run: rustup target add ${{ matrix.target }}
-    
-    - name: Rust Cache
-      uses: Swatinem/rust-cache@v2.7.8
       
     - name: Set flags (cross-compilation)
       if: matrix.cross
