@@ -1,0 +1,11 @@
+[package]
+name = "secretmangle"
+description = "A library for mangling sensitive data in memory with a random key."
+authors = ["Ender Ting <pythonhunter146@gmail.com>"]
+license = "Apache-2.0 OR MIT"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bytemuck = { version = "1.23.1", features = ["derive"] }
+getrandom = "0.3.3"
