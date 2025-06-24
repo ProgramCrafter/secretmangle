@@ -177,11 +177,15 @@ mod tests {
         test_xor_chunks_for_type::<Align16>();
     }
 
+    #[derive(Clone)]
+    #[repr(align(8))]
+    struct PinnedArray([u16; 256]);
+
     #[test]
     fn test_offsetted() {
-        let mut data: [u16; 256] = std::array::from_fn(|i| i as u16);
+        let mut data = PinnedArray(std::array::from_fn(|i| i as u16));
         let mut manual_data = data.clone();
-        let key = [
+        let key = PinnedArray([
             248, 230, 123, 176, 35, 3, 156, 13, 204, 19, 196, 124, 160, 184, 59, 232, 107, 98, 197,
             117, 61, 97, 94, 172, 155, 68, 182, 72, 5, 108, 221, 228, 142, 114, 58, 211, 41, 21,
             22, 168, 169, 189, 158, 52, 183, 136, 171, 56, 50, 223, 207, 226, 175, 144, 205, 234,
@@ -196,7 +200,7 @@ mod tests {
             193, 178, 14, 241, 138, 219, 190, 103, 179, 122, 79, 129, 44, 112, 46, 1, 95, 222, 91,
             162, 73, 127, 33, 145, 27, 71, 249, 253, 92, 34, 47, 15, 173, 161, 62, 149, 227, 181,
             236, 106, 206, 200, 159, 43, 87, 164, 65, 17_u16,
-        ];
+        ]);
 
         fn test<S>(
             data: &mut [u16; 256],
@@ -223,14 +227,14 @@ mod tests {
             assert_eq!(data, manual_data);
         }
 
-        test::<[u8; 38]>(&mut data, &mut manual_data, &key, 0, 0);
-        test::<[u8; 24]>(&mut data, &mut manual_data, &key, 0, 0);
-        test::<[u8; 24]>(&mut data, &mut manual_data, &key, 0, 16);
-        test::<[u8; 24]>(&mut data, &mut manual_data, &key, 3, 0);
-        test::<[u16; 24]>(&mut data, &mut manual_data, &key, 4, 0);
-        test::<[u16; 24]>(&mut data, &mut manual_data, &key, 4, 40);
-        test::<[u64; 9]>(&mut data, &mut manual_data, &key, 8, 0);
-        test::<[u16; 215]>(&mut data, &mut manual_data, &key, 40, 0);
+        test::<[u8; 38]>(&mut data.0, &mut manual_data.0, &key.0, 0, 0);
+        test::<[u8; 24]>(&mut data.0, &mut manual_data.0, &key.0, 0, 0);
+        test::<[u8; 24]>(&mut data.0, &mut manual_data.0, &key.0, 0, 16);
+        test::<[u8; 24]>(&mut data.0, &mut manual_data.0, &key.0, 3, 0);
+        test::<[u16; 24]>(&mut data.0, &mut manual_data.0, &key.0, 4, 0);
+        test::<[u16; 24]>(&mut data.0, &mut manual_data.0, &key.0, 4, 40);
+        test::<[u64; 9]>(&mut data.0, &mut manual_data.0, &key.0, 8, 0);
+        test::<[u16; 215]>(&mut data.0, &mut manual_data.0, &key.0, 40, 0);
     }
 
     #[test]
