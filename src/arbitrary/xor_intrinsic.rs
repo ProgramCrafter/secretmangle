@@ -51,6 +51,45 @@ pub unsafe fn xor_chunks_intrinsic_baseline<T>(data: *mut u8, key: *const u8) {
     }
 }
 
+#[cfg(target_arch = "aarch64")]
+pub unsafe fn xor_chunks_intrinsic_baseline<T>(data: *mut u8, key: *const u8) {
+    use std::arch::asm;
+    
+    let size = std::mem::size_of::<T>();
+    let min_alignment = std::mem::align_of::<T>();
+    let min_alignment_bits: u32 = min_alignment.trailing_zeros();
+    
+    let co_aligned_bits = data.addr().trailing_zeros()
+        .min(key.addr().trailing_zeros());
+    debug_assert!(co_aligned_bits >= min_alignment_bits,
+        "first safety precondition: data and key must be aligned for T");
+    
+    let mut index = 0usize;
+    
+    unsafe {
+        asm!(
+            "b 2f",
+            "1:",
+                "ldrb {key_byte}, [{key}, {index}]",
+                "ldrb {tmp}, [{data}, {index}]",
+                "eor {tmp}, {tmp}, {key_byte}",
+                "strb {tmp}, [{data}, {index}]",
+                "add {index}, {index}, #1",
+            "2:",
+                "cmp {index}, {size}",
+                "b.lo 1b",
+            key_byte = out(reg_byte) _,
+            tmp = out(reg) _,
+            index = inout(reg) index,
+            size = in(reg) size,
+            data = in(reg) data,
+            key = in(reg) key,
+            options(nostack),
+        );
+    }
+}
+
+
 #[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
