@@ -139,6 +139,12 @@ impl<T> MangledBoxArbitrary<T> {
     }
 }
 
+impl<T> Default for MangledBoxArbitrary<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> Drop for MangledBoxArbitrary<T> {
     fn drop(&mut self) {
         let data_ptr = Box::as_mut_ptr(&mut self.data).cast::<u8>();

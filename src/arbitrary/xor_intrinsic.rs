@@ -1,9 +1,9 @@
-/// In C, C++, Rust and whatever languages, it is Undefined Behavior to read
-/// padding bytes of a struct, because those are generally not initialized.
-/// We cannot know which bytes are padding and which are data in advance (nor
-/// compile- nor runtime) so we have to mask all of them.
-/// 
-/// That necessitates assembly code.
+//! In C, C++, Rust and whatever languages, it is Undefined Behavior to read
+//! padding bytes of a struct, because those are generally not initialized.
+//! We cannot know which bytes are padding and which are data in advance (nor
+//! compile- nor runtime) so we have to mask all of them.
+//! 
+//! That necessitates assembly code.
 
 
 /// XORs the data behind the first pointer using the key from the second pointer

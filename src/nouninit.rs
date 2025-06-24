@@ -144,6 +144,12 @@ impl<T: NoUninit> MangledBox<T> {
     }
 }
 
+impl<T: NoUninit> Default for MangledBox<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: NoUninit> Drop for MangledBox<T> {
     fn drop(&mut self) {
         let data_ptr = Box::as_mut_ptr(&mut self.data).cast::<u8>();
