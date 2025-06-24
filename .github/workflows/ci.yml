@@ -25,6 +25,7 @@ jobs:
             # Use cross-compilation for aarch64 on x86_64
             cross: true
             cross_image: messense/rust-musl-cross:aarch64-musl
+            linker: gcc-aarch64-linux-gnu
       fail-fast: false
 
     steps:
@@ -42,7 +43,9 @@ jobs:
 
     - name: Install cross (if needed)
       if: matrix.cross
-      run: cargo install cross --version 0.2.5
+      run: |
+        cargo install cross --version 0.2.5
+        sudo apt install ${{ matrix.linker }}
 
     - name: Install target
       run: rustup target add ${{ matrix.target }}
