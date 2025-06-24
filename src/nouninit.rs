@@ -9,16 +9,16 @@ use bytemuck::NoUninit;
 /// XORs the data behind first pointer using key from second pointer.
 /// The mangling operation is guaranteed to not be reordered after
 /// any later operation, by usage of atomic fence with SeqCst semantics.
-/// (See https://github.com/RustCrypto/utils/blob/34c554f13500dd11566922048d6e865787d6fa51/zeroize/src/lib.rs#L301-L304
+/// (See <https://github.com/RustCrypto/utils/blob/34c554f13500dd11566922048d6e865787d6fa51/zeroize/src/lib.rs#L301-L304>
 /// for more details.)
 /// 
 /// # Safety
-/// - [`data`] and [`key`] must be correctly aligned for `T`
-/// - [`data`] must point to at least `size_of::<T>()` initialized bytes
+/// - `data` and `key` must be correctly aligned for `T`
+/// - `data` must point to at least `size_of::<T>()` initialized bytes
 ///   valid for `u8` reads and writes
-/// - [`key`] must point to at least `size_of::<T>()` initialized bytes
+/// - `key` must point to at least `size_of::<T>()` initialized bytes
 ///   valid for `u8` reads
-/// - [`data`] and [`key`] must either be non-overlapping or the same
+/// - `data` and `key` must either be non-overlapping or the same
 unsafe fn xor_chunks<T>(data: *mut u8, key: *const u8) {
     for i in 0..size_of::<T>() {
         let data_byte = unsafe {*data.wrapping_add(i)};
@@ -45,7 +45,7 @@ unsafe fn xor_chunks<T>(data: *mut u8, key: *const u8) {
 /// It is recommended to use [`std::clone::CloneToUninit`] to initialize
 /// the contents of the box, rather than constructing it on stack.
 pub struct MangledBox<T: NoUninit> {
-    /// Heap allocation with bytes mangled by XORing with [`key`].
+    /// Heap allocation with bytes mangled by XORing with `key`.
     /// Each and every byte of the pointed-to value is initialized too.
     data: Box<MaybeUninit<T>>,
     

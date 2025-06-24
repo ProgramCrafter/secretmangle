@@ -5,20 +5,21 @@
 //! 
 //! That necessitates assembly code.
 
-
 /// XORs the data behind the first pointer using the key from the second pointer
 /// in a fashion that does not provide ordering guarantees but is guaranteed
 /// not to be elided.
 /// 
 /// # Safety
-/// - [`data`] and [`key`] must be correctly aligned for `T`
-/// - [`data`] and [`key`] must have at least `size_of::<T>()` bytes allocated
-/// - [`data`] and [`key`] must either be non-overlapping or the same
+/// - `data` and `key` must be correctly aligned for `T`
+/// - `data` and `key` must have at least `size_of::<T>()` bytes allocated
+/// - `data` and `key` must either be non-overlapping or the same
 ///
 /// No requirements on initialization status are made.
-/// Garbage in, garbage out - instead of UB out.
+/// Garbage in, garbage out (instead of UB out).
 #[cfg(target_arch = "x86_64")]
 pub unsafe fn xor_chunks_intrinsic_baseline<T>(data: *mut u8, key: *const u8) {
+    use std::arch::asm;
+    
     let size = std::mem::size_of::<T>();
     let min_alignment = std::mem::align_of::<T>();
     let min_alignment_bits: u32 = min_alignment.trailing_zeros();
@@ -32,7 +33,7 @@ pub unsafe fn xor_chunks_intrinsic_baseline<T>(data: *mut u8, key: *const u8) {
     unsafe {
         // TODO: consider wider-sized loads
         // TODO: consider partial loop unrolling
-        std::arch::asm!(
+        asm!(
             "2:",
                 "cmp {index}, {size}",
                 "jae 3f",
@@ -51,6 +52,17 @@ pub unsafe fn xor_chunks_intrinsic_baseline<T>(data: *mut u8, key: *const u8) {
     }
 }
 
+/// XORs the data behind the first pointer using the key from the second pointer
+/// in a fashion that does not provide ordering guarantees but is guaranteed
+/// not to be elided.
+/// 
+/// # Safety
+/// - `data` and `key` must be correctly aligned for `T`
+/// - `data` and `key` must have at least `size_of::<T>()` bytes allocated
+/// - `data` and `key` must either be non-overlapping or the same
+///
+/// No requirements on initialization status are made.
+/// Garbage in, garbage out (instead of UB out).
 #[cfg(target_arch = "aarch64")]
 pub unsafe fn xor_chunks_intrinsic_baseline<T>(data: *mut u8, key: *const u8) {
     use std::arch::asm;
@@ -78,9 +90,9 @@ pub unsafe fn xor_chunks_intrinsic_baseline<T>(data: *mut u8, key: *const u8) {
             "2:",
                 "cmp {index}, {size}",
                 "b.lo 1b",
-            key_byte = out(reg_byte) _,
+            key_byte = out(reg) _,
             tmp = out(reg) _,
-            index = inout(reg) index,
+            index = inout(reg) index => _,
             size = in(reg) size,
             data = in(reg) data,
             key = in(reg) key,
@@ -88,7 +100,6 @@ pub unsafe fn xor_chunks_intrinsic_baseline<T>(data: *mut u8, key: *const u8) {
         );
     }
 }
-
 
 #[cfg(all(test, not(miri)))]
 mod tests {

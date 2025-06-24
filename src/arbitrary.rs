@@ -9,13 +9,13 @@ use std::ptr::NonNull;
 /// XORs the data behind first pointer using key from second pointer.
 /// The mangling operation is guaranteed to not be reordered after
 /// any later operation, by usage of atomic fence with SeqCst semantics.
-/// (See https://github.com/RustCrypto/utils/blob/34c554f13500dd11566922048d6e865787d6fa51/zeroize/src/lib.rs#L301-L304
+/// (See <https://github.com/RustCrypto/utils/blob/34c554f13500dd11566922048d6e865787d6fa51/zeroize/src/lib.rs#L301-L304>
 /// for more details.)
 /// 
 /// # Safety
-/// - [`data`] and [`key`] must be correctly aligned for `T`
-/// - [`data`] and [`key`] must have at least `size_of::<T>()` bytes allocated
-/// - [`data`] and [`key`] must either be non-overlapping or the same
+/// - `data` and `key` must be correctly aligned for `T`
+/// - `data` and `key` must have at least `size_of::<T>()` bytes allocated
+/// - `data` and `key` must either be non-overlapping or the same
 ///
 /// No requirements on initialization status are made.
 unsafe fn xor_chunks<T>(data: *mut u8, key: *const u8) {
@@ -37,7 +37,7 @@ unsafe fn xor_chunks<T>(data: *mut u8, key: *const u8) {
 /// the contents of the box rather than constructing it on stack, since the
 /// latter option might leave some trace of value being masked.
 pub struct MangledBoxArbitrary<T> {
-    /// Heap allocation with bytes mangled by XORing with [`key`].
+    /// Heap allocation with bytes mangled by XORing with `key`.
     data: Box<MaybeUninit<T>>,
     
     /// T-sized buffer containing a cryptographically secure random key.
