@@ -59,6 +59,19 @@ impl<T> MangledBoxArbitrary<T> {
         Self {data, key}
     }
 
+    /// Rekeys the box, preserving its contents.
+    pub fn rekey(&mut self) {
+        let mut diff_key = MaybeUninit::<T>::uninit();
+        getrandom::fill_uninit(diff_key.as_bytes_mut()).expect("no keygen");
+        
+        unsafe {
+            xor_chunks::<T>(Box::as_mut_ptr(&mut self.data).cast::<u8>(),
+                            diff_key.as_ptr().cast::<u8>());
+            xor_chunks::<T>(self.key.as_mut_ptr().cast::<u8>(),
+                            diff_key.as_ptr().cast::<u8>());
+        }
+    }
+
     /// Unmangles the contents and invokes the provided closure on it.
     /// Whether the closure panics or returns normally, the contents
     /// are remangled.
@@ -257,6 +270,7 @@ mod tests {
             assert_eq!(unsafe { p.as_ref() }, "hello");
             unsafe { p.as_mut().push_str(" Rust!"); }
         });
+        box_.rekey();
         box_.with_unmangled(|p| {
             let mut s = String::with_capacity(13);
             write!(s, "{:?}", unsafe { p.as_ref() }).unwrap();
