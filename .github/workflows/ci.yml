@@ -44,18 +44,16 @@ jobs:
 
     - name: Install target
       run: rustup target add ${{ matrix.target }}
-
-    - name: Run tests
-      if: !matrix.cross
-      run: cargo test --target ${{ matrix.target }} --no-default-features --verbose
-
-    - name: Run tests (cross-compiled)
+      
+    - name: Set flags (cross-compilation)
       if: matrix.cross
       run: |
         export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
         export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc
         export CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
-        cargo test --target ${{ matrix.target }} --no-default-features --verbose
+      
+    - name: Run tests
+      run: cargo test --target ${{ matrix.target }} --no-default-features --verbose
 
     - name: Run Miri tests (x86_64 only)
       if: matrix.host_triple == 'x86_64-unknown-linux-gnu' && matrix.target == 'x86_64-unknown-linux-gnu'
