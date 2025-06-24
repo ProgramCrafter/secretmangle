@@ -88,10 +88,10 @@ pub unsafe fn xor_chunks_intrinsic_baseline<T>(data: *mut u8, key: *const u8) {
         asm!(
             "b 2f",
             "1:",
-                "ldrb {key_byte}, [{key}, #1]!",
-                "ldrb {tmp}, [{data}, #1]",
+                "ldrb {key_byte:w}, [{key}, #1]!",
+                "ldrb {tmp:w}, [{data}, #1]",
                 "eor {tmp}, {tmp}, {key_byte}",
-                "strb {tmp}, [{data}, #1]!",
+                "strb {tmp:w}, [{data}, #1]!",
                 "subs {size}, {size}, #1",
             "2:",
                 "bne 1b",
