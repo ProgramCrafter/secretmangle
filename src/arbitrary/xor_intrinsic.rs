@@ -86,15 +86,15 @@ pub unsafe fn xor_chunks_intrinsic_baseline<T>(data: *mut u8, key: *const u8) {
 
     unsafe {
         asm!(
-            "b 2f",
+            "cbz {size}, 2f",
             "1:",
-                "ldrb {key_byte:w}, [{key}, #1]!",
-                "ldrb {tmp:w}, [{data}, #1]",
+                "ldrb {key_byte:w}, [{key}], 1",
+                "ldrb {tmp:w}, [{data}]",
                 "eor {tmp}, {tmp}, {key_byte}",
-                "strb {tmp:w}, [{data}, #1]!",
+                "strb {tmp:w}, [{data}], 1",
                 "subs {size}, {size}, #1",
-            "2:",
                 "bne 1b",
+            "2:",
             key_byte = out(reg) _,
             tmp = out(reg) _,
             size = in(reg) size,
@@ -169,12 +169,14 @@ mod tests {
 
     #[test]
     fn test_bytewise() {
+        test_xor_chunks_for_type::<()>();
         test_xor_chunks_for_type::<u8>();
         test_xor_chunks_for_type::<u16>();
         test_xor_chunks_for_type::<u32>();
         test_xor_chunks_for_type::<u64>();
         test_xor_chunks_for_type::<Foo>();
         test_xor_chunks_for_type::<Align16>();
+        test_xor_chunks_for_type::<(u8, u32, (u16, u8, u16, u64))>();
     }
 
     #[derive(Clone)]
