@@ -4,7 +4,7 @@
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 pub use arbitrary::MangledBoxArbitrary;
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-mod arbitrary;
+pub mod arbitrary;
 
 pub use nouninit::MangledBox;
-mod nouninit;
+pub mod nouninit;

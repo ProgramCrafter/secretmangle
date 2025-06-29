@@ -1,4 +1,4 @@
-mod xor_intrinsic;
+pub mod xor_intrinsic;
 
 use std::sync::atomic::{fence, Ordering};
 use std::marker::PhantomData;
