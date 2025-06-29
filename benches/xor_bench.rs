@@ -47,6 +47,23 @@ fn internal_bench_full<const N: usize>(c: &mut Criterion) {
         });
     });
 
+    group.bench_function("intrinsic_barrier", |b| {
+        b.iter(|| {
+            let data = black_box(data_ptr);
+            let key = black_box(key_ptr);
+            
+            // - data and key are properly allocated
+            // - the required alignment for [u8; N] is 1, which is satisfied
+            // - data and key are non-overlapping
+            unsafe {
+                xor_chunks_intrinsic_baseline::<[u8; N]>(data, key);
+            }
+            std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+            
+            black_box(data);
+        });
+    });
+
     group.bench_function("initialized", |b| {
         b.iter(|| {
             let data_ref = black_box(&mut data);
@@ -111,6 +128,23 @@ fn internal_bench_unaligned_same<const N: usize, const F: usize>(
             unsafe {
                 xor_chunks_intrinsic_baseline::<[u8; N]>(data, key);
             }
+            
+            black_box(data);
+        });
+    });
+
+    group.bench_function("intrinsic_barrier_unaligned", |b| {
+        b.iter(|| {
+            let data = black_box(data_ptr);
+            let key = black_box(key_ptr);
+            
+            // - data and key are properly allocated
+            // - the required alignment for [u8; N] is 1, which is satisfied
+            // - data and key are non-overlapping
+            unsafe {
+                xor_chunks_intrinsic_baseline::<[u8; N]>(data, key);
+            }
+            std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
             
             black_box(data);
         });
