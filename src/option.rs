@@ -144,7 +144,7 @@ impl<T> Default for MangledOption<T> {
 }
 
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::mem::size_of;
