@@ -1,0 +1,158 @@
+use std::ptr::{NonNull, write};
+
+use crate::MangledBoxArbitrary;
+
+
+/// [`MangledOption`] is a variant of [`Option`] that is mangled with a random key.
+/// It guarantees that value is initialized whenever [`Some`] variant is used.
+///
+/// [`Option`]: std::option::Option
+/// [`Some`]: std::option::Option::Some
+/// [`None`]: std::option::Option::None
+pub enum MangledOption<T> {
+    Some(MangledBoxArbitrary<T>),
+    None,
+}
+
+impl<T> MangledOption<T> {
+    /// Creates a new [`MangledOption`] with the [`None`] variant.
+    pub fn new() -> Self {
+        Self::None
+    }
+
+    /// Creates a new [`MangledOption`] with the [`Some`] variant.
+    ///
+    /// Please note that often you don't want to have an unmasked T value in the first place.
+    /// You can construct it in-place using [`Self::insert_by_ptr`].
+    pub fn filled_with_unmasked_value(value: T) -> Self {
+        let mut this = Self::new();
+        this.insert_unmasked_value(value);
+        this
+    }
+
+    /// Returns `true` if the option is a [`Some`] variant.
+    pub fn is_some(&self) -> bool {
+        matches!(self, Self::Some(_))
+    }
+
+    /// Returns `true` if the option is a [`None`] variant.
+    pub fn is_none(&self) -> bool {
+        !self.is_some()
+    }
+
+    /// Takes the value out of the option, leaving a [`None`] in its place.
+    pub fn take(&mut self) -> MangledOption<T> {
+        std::mem::take(self)
+    }
+
+    /// Clears the option, dropping the value if it is a [`Some`] variant.
+    pub fn clear(&mut self) {
+        // Drop implementation will handle the old value
+        *self = Self::None;
+    }
+
+    /// Replaces the value in the option, leaving a [`Some`] variant in its place.
+    /// The old value is dropped if it was present.
+    ///
+    /// Please note that often you don't want to have an unmasked T value in the first place.
+    /// You can construct it in-place using [`Self::insert_by_ptr`].
+    pub fn insert_unmasked_value(&mut self, value: T) {
+        self.insert_by_ptr(|p| unsafe { p.write(value); });
+    }
+
+    /// Replaces the value in the option, leaving a [`Some`] variant in its place.
+    /// The old value is dropped if it was present, after construction of the new one.
+    ///
+    /// The pointer passed to the "constructor" is pointing into an uninitialized memory, allocation
+    /// suitable for `T` both in size and alignment.
+    pub fn insert_by_ptr(&mut self, f: impl FnOnce(NonNull<T>)) {
+        let mut new_content_box = MangledBoxArbitrary::new();
+        new_content_box.with_unmangled(f);
+        *self = Self::Some(new_content_box);
+    }
+
+    /// Unmangles the contents and invokes the provided closure on it. Invokes a default
+    /// closure if the option is [`None`] instead.
+    ///
+    /// An immutable version is not available because it would still need to make a mutation, to
+    /// read the data, and it is not possible to do concurrently.
+    ///
+    /// Please check the compiled code to determine if your function makes a spurious copy
+    /// which could be a security issue.
+    pub fn map_mut_or_else<F, G, R>(&mut self, default: G, f: F) -> R
+    where
+        F: FnOnce(&mut T) -> R,
+        G: FnOnce() -> R,
+    {
+        match self {
+            MangledOption::Some(mangled_box) => {
+                mangled_box.with_unmangled(|mut ptr| f(unsafe { ptr.as_mut() }))
+            }
+            MangledOption::None => default(),
+        }
+    }    
+
+    /// Unmangles the contents and invokes the provided closure on it.
+    ///
+    /// An immutable version is not available because it would still need to make a mutation, to
+    /// read the data, and it is not possible to do concurrently.
+    ///
+    /// Please check the compiled code to determine if your function makes a spurious copy
+    /// which could be a security issue.
+    pub fn map_mut<F, R>(&mut self, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut T) -> R,
+    {
+        self.map_mut_or_else(|| None, |m| Some(f(m)))
+    }
+
+    /// Rekeys the box, preserving its contents.
+    pub fn rekey(&mut self) {
+        match self {
+            MangledOption::Some(mangled_box) => {
+                mangled_box.rekey();
+            }
+            MangledOption::None => {}
+        }
+    }
+}
+
+impl<T> Drop for MangledOption<T> {
+    fn drop(&mut self) {
+        match self {
+            MangledOption::Some(mangled_box) => {
+                unsafe { mangled_box.drop_in_place(); }
+            }
+            MangledOption::None => {}
+        }
+        unsafe { write(self as *mut Self, Self::None); }
+    }
+}
+
+impl<T> Default for MangledOption<T> {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_map_mut() {
+        let mut option = MangledOption::filled_with_unmasked_value(42);
+        assert_eq!(option.map_mut(|x| { *x += 1; *x }), Some(43));
+    }
+
+    #[test]
+    fn test_map_mut_or_else() {
+        let mut option = MangledOption::filled_with_unmasked_value(42);
+        assert_eq!(option.map_mut_or_else(|| 5, |x| { *x += 1; *x }), 43);
+
+        option = MangledOption::None;
+        assert_eq!(option.map_mut_or_else(|| 5, |x| { *x += 1; *x }), 5);
+    }
+}
+

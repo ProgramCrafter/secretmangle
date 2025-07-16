@@ -8,3 +8,6 @@ pub mod arbitrary;
 
 pub use nouninit::MangledBox;
 pub mod nouninit;
+
+pub use option::MangledOption;
+pub mod option;
