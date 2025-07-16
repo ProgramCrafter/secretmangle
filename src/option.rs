@@ -138,8 +138,12 @@ impl<T> Default for MangledOption<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::mem::size_of;
+
     use super::*;
-    
+
+
     #[test]
     fn test_map_mut() {
         let mut option = MangledOption::filled_with_unmasked_value(42);
@@ -153,6 +157,104 @@ mod tests {
 
         option = MangledOption::None;
         assert_eq!(option.map_mut_or_else(|| 5, |x| { *x += 1; *x }), 5);
+    }
+    
+    #[test]
+    fn test_new_is_none() {
+        let option: MangledOption<i32> = MangledOption::new();
+        assert!(option.is_none());
+    }
+
+    #[test]
+    fn test_filled_with_unmasked_value() {
+        let mut option = MangledOption::filled_with_unmasked_value(10);
+        assert!(option.is_some());
+        assert_eq!(option.map_mut(|x| *x), Some(10));
+    }
+
+    #[test]
+    fn test_take() {
+        let mut option = MangledOption::filled_with_unmasked_value(20);
+        let mut taken = option.take();
+        
+        assert!(option.is_none());
+        assert_eq!(taken.map_mut(|x| *x), Some(20));
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut option = MangledOption::filled_with_unmasked_value(30);
+        option.clear();
+        assert!(option.is_none());
+    }
+
+    #[test]
+    fn test_insert_unmasked_value() {
+        let mut option = MangledOption::new();
+        option.insert_unmasked_value(40);
+        assert_eq!(option.map_mut(|x| *x), Some(40));
+        
+        option.insert_unmasked_value(50); // Replace existing
+        assert_eq!(option.map_mut(|x| *x), Some(50));
+    }
+
+    #[test]
+    fn test_insert_by_ptr() {
+        let mut option = MangledOption::<usize>::new();
+        option.insert_by_ptr(|ptr| unsafe { ptr.as_ptr().write(60) });
+        assert_eq!(option.map_mut(|x| *x), Some(60));
+        
+        // `*ptr.as_ptr() = 70` would be UB because of touching uninit bytes
+        option.insert_by_ptr(|ptr| unsafe { ptr.as_ptr().write(70) });
+        assert_eq!(option.map_mut(|x| *x), Some(70));
+    }
+
+    #[test]
+    fn test_rekey() {
+        let mut option = MangledOption::filled_with_unmasked_value(80);
+        let original_value = option.map_mut(|x| *x).unwrap();
+        
+        option.rekey(); // Should preserve value
+        assert_eq!(option.map_mut(|x| *x), Some(original_value));
+    }
+
+    #[test]
+    fn test_drop_behavior() {
+        static DROP_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+        struct DropCounter;
+        impl Drop for DropCounter {
+            fn drop(&mut self) {
+                DROP_COUNT.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+
+        {
+            let _option = MangledOption::filled_with_unmasked_value(DropCounter);
+            assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 0);
+        }
+        assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 1);
+
+        {
+            let _option = MangledOption::<DropCounter>::new();
+            assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 1);
+        }
+        assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 1);
+
+        {
+            let mut option = MangledOption::filled_with_unmasked_value(DropCounter);
+            assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 1);
+            option.clear();
+            assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 2);
+        }
+        assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 2);
+
+        {
+            let mut option = MangledOption::new();
+            assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 2);
+            option.insert_unmasked_value(DropCounter);
+        }
+        assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 3);
     }
 }
 
