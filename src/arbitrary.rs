@@ -74,6 +74,14 @@ impl<T> MangledBoxArbitrary<T> {
         }
     }
 
+    pub(crate) fn with_mangled<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(NonNull<T>) -> R {
+        
+        let data_ptr: *mut T = Box::as_mut_ptr(&mut self.data).cast::<T>();
+        f(NonNull::new(data_ptr).unwrap())
+    }
+
     /// Unmangles the contents and invokes the provided closure on it.
     /// Whether the closure panics or returns normally, the contents
     /// are remangled.

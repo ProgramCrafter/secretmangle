@@ -1,4 +1,4 @@
-use std::ptr::{NonNull, write};
+use std::ptr::{NonNull, null_mut, write};
 
 use crate::MangledBoxArbitrary;
 
@@ -90,7 +90,7 @@ impl<T> MangledOption<T> {
             }
             MangledOption::None => default(),
         }
-    }    
+    }
 
     /// Unmangles the contents and invokes the provided closure on it.
     ///
@@ -113,6 +113,14 @@ impl<T> MangledOption<T> {
                 mangled_box.rekey();
             }
             MangledOption::None => {}
+        }
+    }
+
+    /// Returns pointer to mangled data.
+    pub fn as_ptr(&mut self) -> *mut T {
+        match self {
+            MangledOption::Some(mangled_box) => mangled_box.with_mangled(|p| p.as_ptr()),
+            MangledOption::None              => null_mut(),
         }
     }
 }
@@ -255,6 +263,152 @@ mod tests {
             option.insert_unmasked_value(DropCounter);
         }
         assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 3);
+    }
+    
+    #[test]
+    fn test_string_content() {
+        let s = String::from("test_value");
+        let mut option = MangledOption::filled_with_unmasked_value(s);
+        
+        option.map_mut(|inner| assert_eq!(inner, "test_value"));
+        
+        option.map_mut(|inner| inner.push_str("_modified"));
+        option.map_mut(|inner| assert_eq!(inner, "test_value_modified"));
+        
+        // Rekey and verify integrity
+        option.rekey();
+        option.map_mut(|inner| assert_eq!(inner, "test_value_modified"));
+    }
+
+    #[test]
+    fn test_padded_struct() {
+        #[repr(C)]
+        #[derive(Debug, PartialEq)]
+        struct Padded {
+            a: u8,
+            b: u16,
+            c: u32,
+        }
+
+        let val = Padded { a: 0xAA, b: 0xBBBB, c: 0xCCCCCCCC };
+        let mut option = MangledOption::filled_with_unmasked_value(val);
+        
+        option.map_mut(|inner| assert_eq!(*inner, Padded { a: 0xAA, b: 0xBBBB, c: 0xCCCCCCCC }));
+        
+        option.map_mut(|inner| inner.a = 0x11);
+        option.map_mut(|inner| {
+            assert_eq!(inner.a, 0x11);
+            assert_eq!(inner.b, 0xBBBB);
+            assert_eq!(inner.c, 0xCCCCCCCC);
+        });
+        
+        // Rekey and verify integrity
+        option.rekey();
+        option.map_mut(|inner| {
+            inner.b = 0x2222;
+            assert_eq!(inner.a, 0x11);
+        });
+        option.map_mut(|inner| assert_eq!(*inner, Padded { a: 0x11, b: 0x2222, c: 0xCCCCCCCC }));
+    }
+
+    #[test]
+    fn test_large_inline_struct() {
+        #[derive(PartialEq, Eq, Debug)]
+        struct LargeStruct([u64; 8]);
+        
+        let val = LargeStruct([0xDEADBEEF; 8]);
+        let mut option = MangledOption::filled_with_unmasked_value(val);
+        
+        option.map_mut(|inner| assert_eq!(inner.0, [0xDEADBEEF; 8]));
+        
+        // Modify and verify
+        option.map_mut(|inner| inner.0[4] = 0xCAFEBABE);
+        option.map_mut(|inner| {
+            assert_eq!(inner.0[0], 0xDEADBEEF);
+            assert_eq!(inner.0[4], 0xCAFEBABE);
+        });
+    }
+
+    #[test]
+    fn test_rekey_integrity() {
+        struct Nested {
+            a: u32,
+            b: MangledOption<u64>,
+        }
+        
+        let mut option = MangledOption::filled_with_unmasked_value(Nested {
+            a: 0x12345678,
+            b: MangledOption::filled_with_unmasked_value(0xABCDEF),
+        });
+        
+        option.map_mut(|inner| {
+            assert_eq!(inner.a, 0x12345678);
+            assert_eq!(inner.b.map_mut(|x| *x), Some(0xABCDEF));
+        });
+        
+        // Rekey outer and inner
+        option.rekey();
+        option.map_mut(|inner| {
+            inner.b.rekey();
+            inner.a = 0x87654321;
+        });
+        
+        option.map_mut(|inner| {
+            assert_eq!(inner.a, 0x87654321);
+            assert_eq!(inner.b.map_mut(|x| *x), Some(0xABCDEF));
+        });
+        option.map_mut(|inner| {
+            inner.b.map_mut(|x| *x = 0x123456789);
+        });
+        
+        // Final verification
+        option.map_mut(|inner| {
+            assert_eq!(inner.b.map_mut(|x| *x), Some(0x123456789));
+        });
+    }
+    
+    #[test]
+    fn xor_behavior() {
+        #[repr(C)]
+        #[derive(Debug, PartialEq)]
+        struct Padded {
+            a: u8,
+            b: u16,
+            c: u32,
+        }
+        
+        let mut option = MangledOption::new();
+        option.insert_by_ptr(|ptr: NonNull<Padded>| {
+            let a = ptr.addr().trailing_zeros() as u8;
+            let c = size_of::<Padded>() as u32;
+            
+            // Constructing by parts.
+            unsafe {
+                let place: *mut u8 = ptr.as_ptr().cast();
+                place.write(a);
+                place.add(2).write(0xAA);
+                place.add(3).write(0xBB);
+                place.add(4).cast::<u32>().write(c);
+            }
+        });
+        
+        let had = option.map_mut(|inner| {
+            assert!(inner.a < 64);
+            assert_eq!(inner.b, u16::from_ne_bytes([0xAA, 0xBB]));
+            assert_eq!(inner.c as usize, size_of::<Padded>());
+        });
+        assert!(had.is_some());
+        
+        let p: *mut u8 = option.as_ptr().cast();
+        unsafe {
+            p.write(p.read() ^ 128);
+        }
+        let had = option.map_mut(|inner| {
+            assert!(inner.a > 128);
+            assert_eq!(inner.b, u16::from_ne_bytes([0xAA, 0xBB]));
+            assert_eq!(inner.c as usize, size_of::<Padded>());
+        });
+        assert!(had.is_some());
     }
 }
 
